@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Loopback Intelligent · 智能资产匹配 + 买方需求市场</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { background: linear-gradient(135deg, #e0f2fe 0%, #d1fae5 100%); font-family: 'Inter', system-ui, sans-serif; }
+        .glass-card { background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3); }
+        .page-tab-active { background-color: white !important; color: #10b981 !important; border: 1px solid #10b981 !important; box-shadow: 0 1px 3px rgba(16,185,129,0.2); font-weight: 600; }
+        .page-tab-btn { transition: all 0.2s ease; }
+        .demand-card, .match-card { transition: all 0.2s ease; cursor: pointer; }
+        .demand-card:hover, .match-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -12px rgba(0,0,0,0.15); }
+        .score-badge { background: linear-gradient(135deg, #f59e0b, #d97706); cursor: pointer; transition: transform 0.2s; }
+        .score-badge:hover { transform: scale(1.02); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #e2e8f0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
+        .progress-bar { background-color: #e5e7eb; border-radius: 20px; height: 8px; overflow: hidden; }
+        .progress-fill { background-color: #10b981; height: 100%; width: 0%; transition: width 0.3s; }
+        .status-step { transition: all 0.2s; cursor: pointer; display: inline-block; padding: 2px 8px; border-radius: 20px; background: #f3f4f6; }
+        .status-step.active { background-color: #10b981; color: white; }
+        .status-step.completed { background-color: #34d399; color: white; }
+        .suggestion-badge { background: #fef3c7; color: #b45309; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; display: inline-block; }
+    </style>
+</head>
+<body>
+
+    <!-- Top bar -->
+    <div class="bg-white/80 backdrop-blur-md border-b border-white/40 shadow-sm sticky top-0 z-20">
+        <div class="max-w-7xl mx-auto px-4 py-2.5 flex flex-wrap justify-between items-center gap-3">
+            <div class="flex items-center gap-2 text-sm text-gray-600"><i class="fas fa-flask text-emerald-500"></i><span data-i18n="demo_badge">🧪 智能匹配演示 · 积分越高提醒越优先</span></div>
+            <div class="flex gap-2">
+                <div class="flex gap-1 bg-white/60 rounded-full p-1 shadow-sm">
+                    <button data-lang="zh-CN" class="lang-btn px-3 py-1 text-xs rounded-full transition font-bold">简</button>
+                    <button data-lang="en" class="lang-btn px-3 py-1 text-xs rounded-full transition">EN</button>
+                    <button data-lang="zh-TW" class="lang-btn px-3 py-1 text-xs rounded-full transition">繁</button>
+                </div>
+                <button id="tabAssetsBtn" class="page-tab-btn px-5 py-1.5 rounded-full text-sm font-medium border border-gray-200 bg-white/60 page-tab-active" data-i18n="tab_assets">📦 我的资产</button>
+                <button id="tabMarketBtn" class="page-tab-btn px-5 py-1.5 rounded-full text-sm font-medium border border-gray-200 bg-white/60" data-i18n="tab_market">🛒 买方需求市场</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assets Page -->
+    <div id="assetsPage" class="max-w-7xl mx-auto px-4 py-6 md:py-8">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg"><i class="fas fa-arrows-spin text-white text-2xl"></i></div>
+                <div><h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">Loopback <span class="text-emerald-600" data-i18n="brand_intelligent">Intelligent</span></h1><p class="text-gray-500 text-sm mt-0.5" data-i18n="subtitle">可编辑资产 · 多币种 · 高积分获得优先买卖提醒</p></div>
+            </div>
+            <div class="flex flex-wrap gap-3 items-center">
+                <div id="scoreCardBtn" class="score-badge rounded-2xl px-5 py-2 shadow-lg flex items-center gap-3 cursor-pointer"><i class="fas fa-star text-white text-xl"></i><div><p class="text-xs text-white/80" data-i18n="my_points_label">我的积分</p><p class="text-2xl font-bold text-white" id="userScoreDisplay">0</p></div><i class="fas fa-chevron-right text-white/60 text-xs"></i></div>
+                <div id="vipCompactCard" class="bg-gradient-to-r from-amber-100 to-yellow-100 rounded-2xl px-4 py-2 shadow-sm border border-amber-300 cursor-pointer" onclick="openSubscriptionModal()"><div class="flex items-center gap-2"><i class="fas fa-crown text-amber-500"></i><span class="text-sm font-bold" id="vipLevelDisplay">免费版</span><span class="text-xs text-gray-600" id="assetLimitHint">(0/5)</span><i class="fas fa-chevron-right text-xs"></i></div></div>
+                <div class="bg-white/70 backdrop-blur-sm rounded-2xl px-4 py-2 flex items-center gap-3 shadow-sm border border-white/50"><i class="fas fa-coins text-emerald-500 text-lg"></i><select id="displayCurrency" class="text-sm border-0 bg-transparent font-semibold focus:ring-0 cursor-pointer"><option value="CNY">💰 人民币 CNY</option><option value="HKD">🇭🇰 港币 HKD</option><option value="USD">💵 美元 USD</option></select><button id="refreshRatesBtn" class="text-xs bg-gray-100 hover:bg-gray-200 rounded-full px-2.5 py-1.5"><i class="fas fa-sync-alt"></i></button></div>
+            </div>
+        </div>
+
+        <!-- Add Asset Card -->
+        <div class="glass-card rounded-2xl shadow-lg p-5 mb-8">
+            <h2 class="text-xl font-semibold flex items-center gap-2 text-gray-700" data-i18n="add_asset_title"><i class="fas fa-plus-circle text-emerald-500"></i> 添加新资产</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mt-4">
+                <input type="text" id="productName" placeholder="产品名称" class="border border-gray-200 rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="product_name_pl">
+                <select id="productCategory" class="border border-gray-200 rounded-xl px-4 py-2.5 bg-white/80">
+                    <option value="electronics" data-i18n="cat_electronics">📱 电子产品</option>
+                    <option value="fashion" data-i18n="cat_fashion">👕 时尚服装</option>
+                    <option value="furniture" data-i18n="cat_furniture">🛋️ 家具</option>
+                    <option value="vehicle" data-i18n="cat_vehicle">🚲 交通工具</option>
+                </select>
+                <input type="number" id="productPrice" placeholder="原价" class="border border-gray-200 rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="price_pl">
+                <select id="priceCurrency" class="border border-gray-200 rounded-xl px-4 py-2.5 bg-white/80"><option value="CNY">CNY</option><option value="HKD">HKD</option><option value="USD">USD</option></select>
+                <input type="date" id="productDate" class="border border-gray-200 rounded-xl px-4 py-2.5 bg-white/80">
+                <input type="number" id="productYears" placeholder="折旧年限" value="5" step="0.5" class="border border-gray-200 rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="years_pl">
+            </div>
+            <div class="flex justify-between items-center mt-4">
+                <div class="text-xs text-gray-500" data-i18n="add_hint"><i class="fas fa-info-circle"></i> 每完成一笔交易获得积分 → 高积分获得优先好价提醒</div>
+                <button id="addAssetBtn" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-6 py-2.5 rounded-xl shadow-md flex items-center gap-2" data-i18n="create_asset"><i class="fas fa-save"></i> 创建资产</button>
+            </div>
+        </div>
+
+        <!-- 匹配提醒区域 (买方需求提醒卡片) -->
+        <div id="matchesContainer" class="mb-6 space-y-3"></div>
+
+        <!-- Chart + Ad Panel -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 glass-card rounded-2xl shadow-lg p-5">
+                <div class="flex flex-wrap justify-between items-center gap-3 mb-4">
+                    <span class="text-sm font-semibold text-gray-700" data-i18n="trend_view"><i class="fas fa-chart-line text-emerald-500 mr-1"></i> 趋势视图:</span>
+                    <div class="flex gap-2">
+                        <button id="viewAvgBtn" class="view-chart-btn px-4 py-1.5 rounded-full text-sm bg-emerald-600 text-white" data-mode="avg" data-i18n="avg_value">平均价值</button>
+                        <button id="viewIndividualBtn" class="view-chart-btn px-4 py-1.5 rounded-full text-sm bg-gray-200 text-gray-700" data-mode="individual" data-i18n="individual">单个资产</button>
+                    </div>
+                    <div class="text-xs text-gray-500" id="chartHint" data-i18n="chart_hint_avg">当前：投资组合平均趋势</div>
+                </div>
+                <canvas id="trendChart" height="200" style="max-height: 260px;"></canvas>
+            </div>
+            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-5 border border-indigo-100/60">
+                <div class="text-center mb-3"><i class="fas fa-ad text-indigo-500 text-3xl"></i><h3 class="font-bold text-gray-800 text-lg mt-1" data-i18n="partner_promo">合作推广</h3></div>
+                <div class="space-y-4">
+                    <div class="bg-white/70 rounded-xl p-3 border border-indigo-200"><div class="flex items-center gap-3"><i class="fas fa-recycle text-emerald-500 text-xl"></i><div><p class="font-semibold" data-i18n="promo1_title">循环经济认证</p><p class="text-xs text-gray-500" data-i18n="promo1_desc">加入绿色计划获得徽章</p></div></div></div>
+                    <div class="bg-white/70 rounded-xl p-3 border border-indigo-200"><div class="flex items-center gap-3"><i class="fas fa-charging-station text-blue-500 text-xl"></i><div><p class="font-semibold" data-i18n="promo2_title">以旧换新补贴</p><p class="text-xs text-gray-500" data-i18n="promo2_desc">最高20%额外回收奖励</p></div></div></div>
+                    <div class="bg-white/70 rounded-xl p-3 border border-indigo-200"><div class="flex items-center gap-3"><i class="fas fa-leaf text-green-500 text-xl"></i><div><p class="font-semibold" data-i18n="promo3_title">碳中和物流</p><p class="text-xs text-gray-500" data-i18n="promo3_desc">免费上门取件，绿色运输</p></div></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-3"><h2 class="text-xl font-semibold" data-i18n="my_assets_title"><i class="fas fa-cubes text-emerald-500 mr-2"></i> 我的资产 <span class="text-sm text-gray-400" data-i18n="click_edit">(点击编辑)</span></h2><span class="text-xs bg-white/70 px-3 py-1 rounded-full" id="assetCount">0 items</span></div>
+        <div id="assetsContainer" class="space-y-3 max-h-[460px] overflow-y-auto pr-1"><div class="text-center text-gray-400 py-12 bg-white/60 rounded-2xl border border-dashed" data-i18n="no_assets">✨ 暂无资产，请添加上方</div></div>
+    </div>
+
+    <!-- Market Page (买方需求) -->
+    <div id="marketPage" class="max-w-7xl mx-auto px-4 py-6 md:py-8 hidden">
+        <div class="flex items-center gap-3 mb-6"><div class="bg-gradient-to-br from-amber-500 to-orange-600 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg"><i class="fas fa-hand-holding-heart text-white text-2xl"></i></div><div><h1 class="text-3xl md:text-4xl font-bold text-gray-800" data-i18n="market_title">买方需求 <span class="text-amber-600">市场</span></h1><p class="text-gray-500 text-sm" data-i18n="market_sub">实时求购请求 · 点击查看详情 · 高积分获得优先提醒</p></div></div>
+        
+        <!-- 发布需求表单 -->
+        <div class="glass-card rounded-2xl shadow-lg p-5 mb-8">
+            <h2 class="text-xl font-semibold flex items-center gap-2 text-gray-700" data-i18n="post_request_title"><i class="fas fa-pen-alt text-amber-500"></i> 发布求购</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 mt-4">
+                <input type="text" id="demandProduct" placeholder="产品名称" class="border rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="demand_product_pl">
+                <input type="text" id="demandSpec" placeholder="规格型号" class="border rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="spec_pl">
+                <select id="demandCondition" class="border rounded-xl px-4 py-2.5 bg-white/80">
+                    <option value="like_new" data-i18n="cond_like_new">✨ 近乎全新</option>
+                    <option value="slight_use" data-i18n="cond_slight_use">✅ 轻微使用痕迹</option>
+                    <option value="visible_marks" data-i18n="cond_visible_marks">⚠️ 明显磕碰/划痕</option>
+                </select>
+                <input type="number" id="demandQuantity" placeholder="数量" value="1" class="border rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="quantity_pl">
+                <input type="number" id="demandPrice" placeholder="出价(单价)" class="border rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="unit_price_pl">
+                <select id="demandCurrency" class="border rounded-xl px-4 py-2.5 bg-white/80"><option value="CNY">CNY</option><option value="HKD">HKD</option><option value="USD">USD</option></select>
+                <input type="number" id="demandMaxAge" placeholder="最大使用年限(年)" value="4" step="0.5" class="border rounded-xl px-4 py-2.5 bg-white/80" data-i18n-placeholder="max_age_pl">
+            </div>
+            <div class="flex justify-end mt-4"><button id="publishDemandBtn" class="bg-amber-500 hover:bg-amber-600 text-white px-6 py-2.5 rounded-xl shadow-md flex items-center gap-2" data-i18n="publish_btn"><i class="fas fa-plus-circle"></i> 发布求购</button></div>
+        </div>
+
+        <!-- 需求列表切换标签 -->
+        <div class="flex gap-2 mb-4 border-b">
+            <button id="showAllDemandsBtn" class="demand-tab-btn px-4 py-2 text-sm font-medium text-gray-700 border-b-2 border-transparent hover:border-amber-400 transition" data-i18n="all_demands">📋 市场需求</button>
+            <button id="showMyDemandsBtn" class="demand-tab-btn px-4 py-2 text-sm font-medium text-gray-700 border-b-2 border-transparent hover:border-amber-400 transition" data-i18n="my_demands">👤 我发布的需求</button>
+        </div>
+        <div id="demandsContainer" class="space-y-3 max-h-[600px] overflow-y-auto pr-1"></div>
+        <div class="mt-6 p-4 bg-amber-50/70 rounded-xl border border-amber-200 text-xs text-amber-700" data-i18n="market_info"><i class="fas fa-info-circle mr-1"></i> 点击需求卡查看详情；我发布的需求可编辑、删除，并可点击进度步骤更新状态。</div>
+    </div>
+
+    <script>
+        // ==================== 国际化完整词库 ====================
+        const i18n = {
+            'zh-CN': {
+                demo_badge:'🧪 智能匹配演示 · 积分越高提醒越优先', tab_assets:'📦 我的资产', tab_market:'🛒 买方需求市场', brand_intelligent:'Intelligent',
+                subtitle:'可编辑资产 · 多币种 · 高积分获得优先买卖提醒', my_points_label:'我的积分', add_asset_title:'添加新资产', product_name_pl:'产品名称',
+                price_pl:'原价', years_pl:'折旧年限', create_asset:'创建资产', add_hint:'每完成一笔交易获得积分 → 高积分获得优先好价提醒',
+                trend_view:'趋势视图:', avg_value:'平均价值', individual:'单个资产', chart_hint_avg:'当前：投资组合平均趋势', chart_hint_ind:'当前：单个资产对比',
+                partner_promo:'合作推广', promo1_title:'循环经济认证', promo1_desc:'加入绿色计划获得徽章', promo2_title:'以旧换新补贴', promo2_desc:'最高20%额外回收奖励',
+                promo3_title:'碳中和物流', promo3_desc:'免费上门取件，绿色运输', my_assets_title:'我的资产', click_edit:'(点击编辑)', no_assets:'✨ 暂无资产，请添加上方',
+                market_title:'买方需求', market_sub:'实时求购请求 · 点击查看详情 · 高积分获得优先提醒', post_request_title:'发布求购', demand_product_pl:'产品名称',
+                spec_pl:'规格型号', quantity_pl:'数量', unit_price_pl:'单价', max_age_pl:'最大使用年限(年)', publish_btn:'发布求购', all_demands:'📋 市场需求',
+                my_demands:'👤 我发布的需求', market_info:'点击需求卡查看详情；我发布的需求可编辑、删除，并可点击进度步骤更新状态。',
+                vip_free:'免费版', vip_name:'VIP会员', svip_name:'SVIP会员', upgrade_vip:'升级VIP (¥9.9/月)', upgrade_svip:'升级SVIP (¥19.9/月)',
+                asset_limit_free:'最多5个资产', asset_limit_vip:'最多10个资产', asset_limit_svip:'无限资产', vip_priority:'✓ 优先匹配提醒',
+                close:'关闭', edit:'编辑', sell_action:'立即卖出', revalue_action:'重新估值', recommend_selling:'推荐出售', hold_suggest:'暂不建议出售',
+                strong_sell:'强烈建议出售', buyer_offer:'买家出价', your_valuation:'您的当前估价', suggest_sell:'建议', profit_percent:'溢价', loss_percent:'折价',
+                match_reminder:'📢 匹配到买方需求', sell_confirm:'确认卖出', valuation_q1:'产品型号', valuation_q2:'实际已使用年限(年)', valuation_q3:'磕碰程度',
+                valuation_opt_none:'无磕碰', valuation_opt_light:'轻微磕碰', valuation_opt_heavy:'明显磕碰/划痕', valuation_batt:'电池健康度',
+                valuation_batt_high:'90%-100%', valuation_batt_med:'70%-90%', valuation_batt_low:'低于70%', continue_use_question:'是否继续使用该产品？',
+                continue_use_yes:'继续使用（双倍余额递减法，前期折旧快）', continue_use_no:'不再使用（直线法，折旧更平缓）', estimated_value:'智能估值结果',
+                points_detail:'积分详情', current_points:'当前积分', current_level:'当前等级', next_level:'下一等级', points_progress:'积分进度',
+                earn_ways:'赚取方式', complete_trade:'完成一笔交易', value_retention:'资产保值超过70%', hold_year:'持有资产超1年', green_logistics:'绿色物流',
+                daily_checkin:'每日签到', level_benefits:'等级权益', basic_alerts:'基础提醒', priority_alerts:'优先提醒', vip_subsidy:'1%补贴',
+                high_priority:'高优先级', gold_subsidy:'3%补贴', platinum_benefits:'VIP通道+5%补贴', diamond_benefits:'顶级+10%补贴',
+                bronze:'🌱 青铜', silver:'🍃 白银', gold:'🌟 黄金', platinum:'💎 铂金', diamond:'👑 钻石', edit_demand:'编辑需求', progress:'进度',
+                release:'发布', collect:'收集', inspect:'检验', deliver:'交货', status:'状态', spec:'规格', condition:'成色', total_budget:'总预算',
+                contact_info:'联系方式', cat_electronics:'📱 电子产品', cat_fashion:'👕 时尚服装', cat_furniture:'🛋️ 家具', cat_vehicle:'🚲 交通工具',
+                cond_like_new:'✨ 近乎全新', cond_slight_use:'✅ 轻微使用痕迹', cond_visible_marks:'⚠️ 明显磕碰/划痕', straight_line:'直线法', double_declining:'双倍余额递减',
+                save_changes:'保存修改', edit_asset_title:'编辑资产', asset_name:'资产名称', purchase_date:'购买日期', useful_years:'折旧年限', depreciation_method:'折旧方法',
+                resell:'转售', estimated_value_btn:'估值', year_unit:'年', original_price:'原价'
+            },
+            'en': {
+                demo_badge:'🧪 Demo · Priority by Points', tab_assets:'📦 My Assets', tab_market:'🛒 Buyer Demand', brand_intelligent:'Intelligent',
+                subtitle:'Editable Assets · Multi-Currency · Higher Points Get Priority', my_points_label:'My Points', add_asset_title:'Add New Asset',
+                product_name_pl:'Product Name', price_pl:'Original Price', years_pl:'Depreciation Years', create_asset:'Create Asset',
+                add_hint:'Each transaction earns points → higher points = priority alerts', trend_view:'Trend View:', avg_value:'Average Value',
+                individual:'Individual', chart_hint_avg:'Current: Portfolio average', chart_hint_ind:'Current: Individual comparison',
+                partner_promo:'Partner Promotion', promo1_title:'Circular Economy Cert', promo1_desc:'Join green program', promo2_title:'Trade-in Subsidy',
+                promo2_desc:'Up to 20% bonus', promo3_title:'Carbon Neutral Logistics', promo3_desc:'Free pickup, green shipping', my_assets_title:'My Assets',
+                click_edit:'(click to edit)', no_assets:'✨ No assets yet', market_title:'Buyer Demand', market_sub:'Real-time requests · Click for details',
+                post_request_title:'Post a Request', demand_product_pl:'Product', spec_pl:'Spec', quantity_pl:'Qty', unit_price_pl:'Unit Price', max_age_pl:'Max age (years)',
+                publish_btn:'Publish', all_demands:'📋 Market Demands', my_demands:'👤 My Demands', market_info:'Click for details; my demands can be edited.',
+                vip_free:'Free', vip_name:'VIP', svip_name:'SVIP', upgrade_vip:'Upgrade VIP ($9.9/mo)', upgrade_svip:'Upgrade SVIP ($19.9/mo)',
+                asset_limit_free:'Max 5 assets', asset_limit_vip:'Max 10 assets', asset_limit_svip:'Unlimited', vip_priority:'✓ Priority alerts',
+                close:'Close', edit:'Edit', sell_action:'Sell Now', revalue_action:'Revalue', recommend_selling:'Recommend Sell', hold_suggest:'Not Recommended',
+                strong_sell:'Strongly Recommend', buyer_offer:'Buyer Offer', your_valuation:'Your Valuation', suggest_sell:'Suggestion', profit_percent:'premium',
+                loss_percent:'discount', match_reminder:'📢 Buyer Demand Matched', sell_confirm:'Confirm Sell?', valuation_q1:'Model', valuation_q2:'Actual used years',
+                valuation_q3:'Scratch/Dent', valuation_opt_none:'No damage', valuation_opt_light:'Minor scratches', valuation_opt_heavy:'Obvious damage',
+                valuation_batt:'Battery health', valuation_batt_high:'90%-100%', valuation_batt_med:'70%-90%', valuation_batt_low:'Below 70%',
+                continue_use_question:'Do you plan to continue using this product?', continue_use_yes:'Yes (Double Declining)', continue_use_no:'No (Straight Line)',
+                estimated_value:'Smart Valuation', points_detail:'Points Details', current_points:'Current Points', current_level:'Current Level',
+                next_level:'Next Level', points_progress:'Points Progress', earn_ways:'Ways to Earn', complete_trade:'Complete a trade',
+                value_retention:'Value retention >70%', hold_year:'Hold >1 year', green_logistics:'Green logistics', daily_checkin:'Daily check-in',
+                level_benefits:'Level Benefits', basic_alerts:'Basic alerts', priority_alerts:'Priority alerts', vip_subsidy:'1% subsidy',
+                high_priority:'High priority', gold_subsidy:'3% subsidy', platinum_benefits:'VIP channel +5%', diamond_benefits:'Top tier +10%',
+                bronze:'🌱 Bronze', silver:'🍃 Silver', gold:'🌟 Gold', platinum:'💎 Platinum', diamond:'👑 Diamond', edit_demand:'Edit', progress:'Progress',
+                release:'Release', collect:'Collect', inspect:'Inspect', deliver:'Deliver', status:'Status', spec:'Spec', condition:'Condition',
+                total_budget:'Total Budget', contact_info:'Contact', cat_electronics:'📱 Electronics', cat_fashion:'👕 Fashion', cat_furniture:'🛋️ Furniture',
+                cat_vehicle:'🚲 Vehicle', cond_like_new:'✨ Like New', cond_slight_use:'✅ Slight Use', cond_visible_marks:'⚠️ Visible Marks',
+                straight_line:'Straight-Line', double_declining:'Double Declining', save_changes:'Save Changes', edit_asset_title:'Edit Asset',
+                asset_name:'Asset Name', purchase_date:'Purchase Date', useful_years:'Useful Years', depreciation_method:'Depreciation Method',
+                resell:'Resell', estimated_value_btn:'Estimate', year_unit:'yrs', original_price:'Original'
+            },
+            'zh-TW': {
+                demo_badge:'🧪 智能配對演示 · 積分越高提醒越優先', tab_assets:'📦 我的資產', tab_market:'🛒 買方需求市場', brand_intelligent:'Intelligent',
+                subtitle:'可編輯資產 · 多幣種 · 高積分獲得優先買賣提醒', my_points_label:'我的積分', add_asset_title:'添加新資產', product_name_pl:'產品名稱',
+                price_pl:'原價', years_pl:'折舊年限', create_asset:'創建資產', add_hint:'每完成一筆交易獲得積分 → 高積分獲得優先好價提醒',
+                trend_view:'趨勢視圖:', avg_value:'平均價值', individual:'單個資產', chart_hint_avg:'當前：投資組合平均趨勢', chart_hint_ind:'當前：單個資產對比',
+                partner_promo:'合作推廣', promo1_title:'循環經濟認證', promo1_desc:'加入綠色計劃獲得徽章', promo2_title:'以舊換新補貼', promo2_desc:'最高20%額外回收獎勵',
+                promo3_title:'碳中和物流', promo3_desc:'免費上門取件，綠色運輸', my_assets_title:'我的資產', click_edit:'(點擊編輯)', no_assets:'✨ 暫無資產，請添加上方',
+                market_title:'買方需求', market_sub:'實時求購請求 · 點擊查看詳情 · 高積分獲得優先提醒', post_request_title:'發佈求購', demand_product_pl:'產品名稱',
+                spec_pl:'規格型號', quantity_pl:'數量', unit_price_pl:'單價', max_age_pl:'最大使用年限(年)', publish_btn:'發佈求購', all_demands:'📋 市場需求',
+                my_demands:'👤 我發佈的需求', market_info:'點擊需求卡查看詳情；我發佈的需求可編輯、刪除，並可點擊進度步驟更新狀態。',
+                vip_free:'免費版', vip_name:'VIP會員', svip_name:'SVIP會員', upgrade_vip:'升級VIP (HK$9.9/月)', upgrade_svip:'升級SVIP (HK$19.9/月)',
+                asset_limit_free:'最多5個資產', asset_limit_vip:'最多10個資產', asset_limit_svip:'無限資產', vip_priority:'✓ 優先匹配提醒',
+                close:'關閉', edit:'編輯', sell_action:'立即賣出', revalue_action:'重新估值', recommend_selling:'推薦出售', hold_suggest:'暫不建議出售',
+                strong_sell:'強烈建議出售', buyer_offer:'買家出價', your_valuation:'您的當前估值', suggest_sell:'建議', profit_percent:'溢價', loss_percent:'折價',
+                match_reminder:'📢 配對到買方需求', sell_confirm:'確認賣出？', valuation_q1:'產品型號', valuation_q2:'實際已使用年限(年)', valuation_q3:'磕碰程度',
+                valuation_opt_none:'無磕碰', valuation_opt_light:'輕微磕碰', valuation_opt_heavy:'明顯磕碰/劃痕', valuation_batt:'電池健康度',
+                valuation_batt_high:'90%-100%', valuation_batt_med:'70%-90%', valuation_batt_low:'低於70%', continue_use_question:'是否繼續使用該產品？',
+                continue_use_yes:'繼續使用（雙倍餘額遞減法，前期折舊快）', continue_use_no:'不再使用（直線法，折舊更平緩）', estimated_value:'智能估值結果',
+                points_detail:'積分詳情', current_points:'當前積分', current_level:'當前等級', next_level:'下一等級', points_progress:'積分進度',
+                earn_ways:'賺取方式', complete_trade:'完成一筆交易', value_retention:'資產保值超過70%', hold_year:'持有資產超1年', green_logistics:'綠色物流',
+                daily_checkin:'每日簽到', level_benefits:'等級權益', basic_alerts:'基礎提醒', priority_alerts:'優先提醒', vip_subsidy:'1%補貼',
+                high_priority:'高優先級', gold_subsidy:'3%補貼', platinum_benefits:'VIP通道+5%補貼', diamond_benefits:'頂級+10%補貼',
+                bronze:'🌱 青銅', silver:'🍃 白銀', gold:'🌟 黃金', platinum:'💎 鉑金', diamond:'👑 鑽石', edit_demand:'編輯需求', progress:'進度',
+                release:'發佈', collect:'收集', inspect:'檢驗', deliver:'交貨', status:'狀態', spec:'規格', condition:'成色', total_budget:'總預算',
+                contact_info:'聯繫方式', cat_electronics:'📱 電子產品', cat_fashion:'👕 時尚服裝', cat_furniture:'🛋️ 家具', cat_vehicle:'🚲 交通工具',
+                cond_like_new:'✨ 近乎全新', cond_slight_use:'✅ 輕微使用痕跡', cond_visible_marks:'⚠️ 明顯磕碰/劃痕', straight_line:'直線法', double_declining:'雙倍餘額遞減',
+                save_changes:'保存修改', edit_asset_title:'編輯資產', asset_name:'資產名稱', purchase_date:'購買日期', useful_years:'折舊年限', depreciation_method:'折舊方法',
+                resell:'轉售', estimated_value_btn:'估值', year_unit:'年', original_price:'原價'
+            }
+        };
+        let currentLang = 'zh-CN';
+        function t(key) { return i18n[currentLang][key] || key; }
+        function updatePageLanguage() {
+            document.querySelectorAll('[data-i18n]').forEach(el => { const k = el.getAttribute('data-i18n'); if(k) el.innerText = t(k); });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { const k = el.getAttribute('data-i18n-placeholder'); if(k) el.placeholder = t(k); });
+            document.querySelectorAll('#productCategory option, #demandCondition option').forEach(opt => { const k = opt.getAttribute('data-i18n'); if(k) opt.innerText = t(k); });
+            renderAssetsList(); renderDemandsList(); renderMatches(); updateTrendChart(); updateVipUI();
+        }
+        function setLanguage(lang) { currentLang = lang; document.querySelectorAll('.lang-btn').forEach(btn => { if(btn.dataset.lang === lang) btn.classList.add('bg-emerald-600','text-white'); else btn.classList.remove('bg-emerald-600','text-white'); }); updatePageLanguage(); }
+
+        // 用户标识
+        const CURRENT_USER_ID = "user_123";
+        
+        // 核心数据
+        let assets = [], allDemands = [], trendChart = null, currentDisplay = 'CNY', chartMode = 'avg';
+        let exchangeRates = { USD:1, CNY:7.25, HKD:7.82 };
+        let userScore = 0, SCORE_KEY='loopback_score';
+        let vipLevel = 'free'; const VIP_KEY='loopback_vip';
+        const DEPRECIATION_METHODS = { STRAIGHT_LINE:'straight_line', DOUBLE_DECLINING:'double_declining' };
+        function getSymbol(curr) { return { USD:'$', CNY:'¥', HKD:'HK$' }[curr] || '¥'; }
+        function convert(amount, fromCurr, toCurr) { if(fromCurr===toCurr) return amount; const usd = amount / exchangeRates[fromCurr]; return Math.round(usd * exchangeRates[toCurr] * 100)/100; }
+        function calcValueAtDate(asset, targetDate=new Date()) { const price=asset.price, purchase=new Date(asset.purchaseDate), years=asset.usefulYears, method=asset.depreciationMethod||DEPRECIATION_METHODS.DOUBLE_DECLINING; const salvage=price*0.05, msYear=365.25*24*3600*1000; let elapsed=(targetDate-purchase)/msYear; elapsed=Math.max(0, Math.min(elapsed, years*1.5)); if(method===DEPRECIATION_METHODS.STRAIGHT_LINE){ const annual=(price-salvage)/years; let val=price-annual*elapsed; return Math.max(salvage, Math.round(val*100)/100); } let book=price, rate=2/years, fullYears=Math.floor(elapsed); for(let i=0;i<fullYears;i++){ const remain=years-i; if(remain<=2) book-=(book-salvage)/remain; else book-=book*rate; if(book<salvage) book=salvage; } let frac=elapsed-fullYears; if(frac>0 && book>salvage){ const remainLife=years-fullYears; if(remainLife<=2) book-=(book-salvage)/remainLife*frac; else book-=book*rate*frac; if(book<salvage) book=salvage; } return Math.round(book*100)/100; }
+        function currentValue(asset){ let base=calcValueAtDate(asset); const seed=(asset.id*131)%997; const factor=0.94+(seed%120)/1000; let final=base*factor; const days=(new Date()-new Date(asset.purchaseDate))/(86400000); if(days<30) final=Math.min(asset.price, final*1.02); return Math.round(final*100)/100; }
+        function getUsedYears(asset) { return Math.max(0, (new Date() - new Date(asset.purchaseDate)) / (365.25 * 24 * 3600 * 1000)); }
+        
+        // 估值问卷（包含继续使用询问）
+        function showValuationQuestionnaire(asset = null, callback) {
+            const isEdit = !!asset;
+            const modalDiv = document.createElement('div');
+            modalDiv.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm';
+            modalDiv.innerHTML = `
+                <div class="bg-white rounded-2xl max-w-md w-full p-5 max-h-[85vh] overflow-y-auto">
+                    <h3 class="font-bold text-xl mb-3">${isEdit ? t('revalue_action') : t('estimated_value')}</h3>
+                    <div class="space-y-3">
+                        <div><label class="block text-sm font-medium">${t('valuation_q1')}</label><input id="valModel" class="w-full border rounded-lg p-2" value="${asset ? asset.name : ''}"></div>
+                        <div><label class="block text-sm font-medium">${t('valuation_q2')}</label><input id="valUsedYears" type="number" step="0.5" class="w-full border rounded-lg p-2" value="${asset ? getUsedYears(asset).toFixed(1) : '1.0'}"></div>
+                        <div><label class="block text-sm font-medium">${t('valuation_q3')}</label><select id="valScratch" class="w-full border rounded-lg p-2"><option value="none">${t('valuation_opt_none')}</option><option value="light">${t('valuation_opt_light')}</option><option value="heavy">${t('valuation_opt_heavy')}</option></select></div>
+                        <div><label class="block text-sm font-medium">${t('valuation_batt')}</label><select id="valBattery" class="w-full border rounded-lg p-2"><option value="high">${t('valuation_batt_high')}</option><option value="med">${t('valuation_batt_med')}</option><option value="low">${t('valuation_batt_low')}</option></select></div>
+                        <div class="border-t pt-3 mt-2"><p class="font-semibold">${t('continue_use_question')}</p><div class="flex gap-3 mt-1"><label><input type="radio" name="continueUse" value="yes" checked> ${t('continue_use_yes')}</label><label><input type="radio" name="continueUse" value="no"> ${t('continue_use_no')}</label></div></div>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-4"><button id="valSubmitBtn" class="bg-emerald-500 text-white px-4 py-2 rounded-lg">${t('estimated_value')}</button><button id="valCancelBtn" class="bg-gray-200 px-4 py-2 rounded-lg">${t('close')}</button></div>
+                </div>`;
+            document.body.appendChild(modalDiv);
+            const close = () => modalDiv.remove();
+            document.getElementById('valCancelBtn')?.addEventListener('click', close);
+            document.getElementById('valSubmitBtn')?.addEventListener('click', () => {
+                const model = document.getElementById('valModel').value;
+                const usedYears = parseFloat(document.getElementById('valUsedYears').value);
+                const scratch = document.getElementById('valScratch').value;
+                const battery = document.getElementById('valBattery').value;
+                let basePrice = 5000; if(model.toLowerCase().includes('iphone')) basePrice = 6000; else if(model.toLowerCase().includes('macbook')) basePrice = 8000; else basePrice = 4000;
+                let scratchFactor = scratch === 'none' ? 1.0 : (scratch === 'light' ? 0.85 : 0.65);
+                let batteryFactor = battery === 'high' ? 1.0 : (battery === 'med' ? 0.85 : 0.7);
+                let usedFactor = Math.max(0.1, 1 - (usedYears * 0.12));
+                let estimated = basePrice * usedFactor * scratchFactor * batteryFactor;
+                estimated = Math.round(estimated / 10) * 10;
+                const continueUse = document.querySelector('input[name="continueUse"]:checked').value === 'yes';
+                alert(`${t('estimated_value')}: ${getSymbol('CNY')}${estimated}`);
+                close();
+                if(callback) callback(estimated, model, continueUse);
+            });
+        }
+        
+        // 添加资产
+        async function addAssetWithQuestionnaire() {
+            if(assets.length >= getAssetLimit()){ alert(`已达资产上限`); return; }
+            const nameRaw = document.getElementById('productName').value.trim();
+            if(!nameRaw){ alert('请填写产品名称'); return; }
+            const currency = document.getElementById('priceCurrency').value;
+            const purchaseDate = document.getElementById('productDate').value;
+            let usefulYears = parseFloat(document.getElementById('productYears').value);
+            if(!purchaseDate) { alert('请填写购买日期'); return; }
+            showValuationQuestionnaire(null, (estimated, modelName, continueUse) => {
+                const finalName = modelName || nameRaw;
+                const method = continueUse ? DEPRECIATION_METHODS.DOUBLE_DECLINING : DEPRECIATION_METHODS.STRAIGHT_LINE;
+                assets.unshift({ id: Date.now(), name: finalName, price: estimated, currency, purchaseDate, usefulYears, depreciationMethod: method });
+                saveAssets(); renderAssetsList(); addScore(5);
+                alert(`✅ 资产已添加，估值: ${getSymbol(currency)}${estimated}，折旧方法：${method===DEPRECIATION_METHODS.DOUBLE_DECLINING?t('double_declining'):t('straight_line')}`);
+                document.getElementById('productName').value = '';
+                document.getElementById('productPrice').value = '';
+                document.getElementById('productDate').value = '';
+            });
+        }
+        
+        // 重新估值
+        function revalueAsset(asset) {
+            showValuationQuestionnaire(asset, (newValue, newName, continueUse) => {
+                asset.name = newName;
+                asset.price = newValue;
+                asset.depreciationMethod = continueUse ? DEPRECIATION_METHODS.DOUBLE_DECLINING : DEPRECIATION_METHODS.STRAIGHT_LINE;
+                saveAssets(); renderAssetsList(); renderMatches();
+                alert(`重新估值完成！新估值: ${getSymbol(asset.currency)}${newValue}`);
+            });
+        }
+        
+        // 编辑资产模态框
+        function openEditAssetModal(asset) {
+            const modalDiv = document.createElement('div');
+            modalDiv.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm';
+            modalDiv.innerHTML = `
+                <div class="bg-white rounded-2xl max-w-md w-full p-5">
+                    <h3 class="font-bold text-xl mb-4">${t('edit_asset_title')}</h3>
+                    <div class="space-y-3">
+                        <input id="editName" class="w-full border rounded-xl p-2" value="${escapeHtml(asset.name)}" placeholder="${t('asset_name')}">
+                        <input id="editPrice" type="number" class="w-full border rounded-xl p-2" value="${asset.price}" placeholder="${t('price_pl')}">
+                        <select id="editCurrency" class="w-full border rounded-xl p-2"><option ${asset.currency==='CNY'?'selected':''}>CNY</option><option ${asset.currency==='HKD'?'selected':''}>HKD</option><option ${asset.currency==='USD'?'selected':''}>USD</option></select>
+                        <input id="editDate" type="date" class="w-full border rounded-xl p-2" value="${asset.purchaseDate}">
+                        <input id="editYears" type="number" step="0.5" class="w-full border rounded-xl p-2" value="${asset.usefulYears}" placeholder="${t('useful_years')}">
+                        <select id="editMethod" class="w-full border rounded-xl p-2"><option value="double_declining" ${asset.depreciationMethod===DEPRECIATION_METHODS.DOUBLE_DECLINING?'selected':''}>${t('double_declining')}</option><option value="straight_line" ${asset.depreciationMethod===DEPRECIATION_METHODS.STRAIGHT_LINE?'selected':''}>${t('straight_line')}</option></select>
+                    </div>
+                    <div class="flex justify-end gap-2 mt-4"><button id="saveEditBtn" class="bg-emerald-500 text-white px-4 py-2 rounded-lg">${t('save_changes')}</button><button id="closeModalBtn" class="bg-gray-200 px-4 py-2 rounded-lg">${t('close')}</button></div>
+                </div>`;
+            document.body.appendChild(modalDiv);
+            const close = () => modalDiv.remove();
+            document.getElementById('closeModalBtn')?.addEventListener('click', close);
+            document.getElementById('saveEditBtn')?.addEventListener('click', () => {
+                asset.name = document.getElementById('editName').value;
+                asset.price = parseFloat(document.getElementById('editPrice').value);
+                asset.currency = document.getElementById('editCurrency').value;
+                asset.purchaseDate = document.getElementById('editDate').value;
+                asset.usefulYears = parseFloat(document.getElementById('editYears').value);
+                asset.depreciationMethod = document.getElementById('editMethod').value;
+                saveAssets(); renderAssetsList(); renderMatches(); close();
+            });
+        }
+        
+        // 匹配逻辑
+        function getMatches() {
+            if(!assets.length || !allDemands.length) return [];
+            let matches = [];
+            for(let demand of allDemands) {
+                for(let asset of assets) {
+                    if(getUsedYears(asset) <= demand.maxAge && asset.name.toLowerCase().includes(demand.product.toLowerCase())) {
+                        const assetVal = currentValue(asset);
+                        const profit = demand.price - convert(assetVal, asset.currency, demand.currency);
+                        matches.push({ asset, demand, assetVal, profit, usedYears: getUsedYears(asset) });
+                    }
+                }
+            }
+            const priority = { svip:3, vip:2, free:1 };
+            matches.sort((a,b) => { const pa = priority[vipLevel], pb = priority[vipLevel]; if(pa !== pb) return pb - pa; return b.profit - a.profit; });
+            return matches;
+        }
+        
+        // 渲染匹配提醒
+        function renderMatches() {
+            const container = document.getElementById('matchesContainer');
+            const matches = getMatches();
+            if(!matches.length) { container.innerHTML = ''; return; }
+            let html = `<div class="space-y-3"><div class="flex items-center gap-2 text-amber-700 font-semibold"><i class="fas fa-bell"></i> ${t('match_reminder')}</div>`;
+            for(let m of matches.slice(0,5)) {
+                const sym = getSymbol(currentDisplay);
+                const assetVal = convert(m.assetVal, m.asset.currency, currentDisplay).toFixed(2);
+                const buyerOffer = convert(m.demand.price, m.demand.currency, currentDisplay).toFixed(2);
+                const profitPercent = ((buyerOffer - assetVal)/assetVal*100).toFixed(0);
+                const isProfit = profitPercent > 0;
+                const suggestion = isProfit ? (profitPercent>15 ? t('strong_sell') : t('recommend_selling')) : t('hold_suggest');
+                html += `<div class="bg-white/90 rounded-xl p-4 border-l-8 ${isProfit ? 'border-emerald-500' : 'border-amber-400'} shadow-md match-card">
+                    <div class="flex flex-wrap justify-between items-start">
+                        <div><p class="font-bold text-gray-800">${escapeHtml(m.asset.name)}</p>
+                        <p class="text-sm text-gray-600">${t('your_valuation')}: <span class="font-mono">${sym}${assetVal}</span> | ${t('buyer_offer')}: <span class="font-mono">${sym}${buyerOffer}</span> (${profitPercent>0?`+${profitPercent}% ${t('profit_percent')}`:`${profitPercent}% ${t('loss_percent')}`})</p>
+                        <p><span class="suggestion-badge">${suggestion}</span></p>
+                        <p class="text-xs text-gray-400 mt-1">📅 ${t('used_years')} ${m.usedYears.toFixed(1)}${t('year_unit')} | ${t('demand_qty')}: ${m.demand.quantity}</p></div>
+                        <div class="flex gap-2 mt-2 sm:mt-0"><button class="revalue-match-btn text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-lg" data-asset-id="${m.asset.id}">${t('revalue_action')}</button><button class="sell-match-btn text-xs bg-emerald-600 text-white px-3 py-1 rounded-lg" data-asset-id="${m.asset.id}" data-demand-id="${m.demand.id}">${t('sell_action')}</button></div>
+                    </div></div>`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+            document.querySelectorAll('.revalue-match-btn').forEach(btn => btn.addEventListener('click', () => { const aid = parseInt(btn.dataset.assetId); const asset = assets.find(a=>a.id===aid); if(asset) revalueAsset(asset); }));
+            document.querySelectorAll('.sell-match-btn').forEach(btn => btn.addEventListener('click', () => { const aid = parseInt(btn.dataset.assetId); const did = parseInt(btn.dataset.demandId); const asset = assets.find(a=>a.id===aid); const demand = allDemands.find(d=>d.id===did); if(asset && demand && confirm(`${t('sell_confirm')} ${asset.name} ? +10 ${t('my_points_label')}`)) { assets = assets.filter(a=>a.id!==aid); saveAssets(); addScore(10); renderAssetsList(); renderMatches(); alert(`✅ ${t('complete_trade')} +10 ${t('my_points_label')}`); } }));
+        }
+        
+        // 资产列表渲染
+        function renderAssetsList() {
+            const container = document.getElementById('assetsContainer');
+            if(!assets.length){ container.innerHTML=`<div class="text-center text-gray-400 py-12 bg-white/60 rounded-2xl border border-dashed">✨ ${t('no_assets')}</div>`; updateTrendChart(); return; }
+            let html = ''; assets.forEach(a => {
+                const val = currentValue(a), disp = convert(val, a.currency, currentDisplay), sym = getSymbol(currentDisplay);
+                html += `<div class="asset-card bg-white/80 rounded-xl shadow-md p-3"><div class="flex justify-between items-start"><div><h3 class="font-bold">${escapeHtml(a.name)}</h3><div class="text-xs text-gray-500">${a.depreciationMethod===DEPRECIATION_METHODS.STRAIGHT_LINE?t('straight_line'):t('double_declining')}</div><div class="text-xs text-gray-400">📅 ${new Date(a.purchaseDate).toLocaleDateString()} | ⏱️ ${getUsedYears(a).toFixed(1)}${t('year_unit')}</div></div><div class="text-right"><div class="font-bold text-emerald-700">${sym}${disp.toFixed(2)}</div><div class="text-xs text-gray-400">${t('original_price')} ${sym}${convert(a.price, a.currency, currentDisplay).toFixed(2)}</div><div class="flex gap-2 mt-2"><button class="edit-asset-btn text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded" data-id="${a.id}">✏️ ${t('edit')}</button><button class="revalue-asset-btn text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded" data-id="${a.id}">${t('revalue_action')}</button><button class="delete-asset-btn text-xs bg-gray-50 text-gray-500 px-2 py-1 rounded" data-id="${a.id}">🗑️ ${t('close')}</button></div></div></div></div>`;
+            }); container.innerHTML = html;
+            document.querySelectorAll('.edit-asset-btn').forEach(btn => btn.addEventListener('click', () => openEditAssetModal(assets.find(a=>a.id==parseInt(btn.dataset.id)))));
+            document.querySelectorAll('.revalue-asset-btn').forEach(btn => btn.addEventListener('click', () => revalueAsset(assets.find(a=>a.id==parseInt(btn.dataset.id)))));
+            document.querySelectorAll('.delete-asset-btn').forEach(btn => btn.addEventListener('click', () => { assets = assets.filter(a=>a.id!=parseInt(btn.dataset.id)); saveAssets(); renderAssetsList(); renderMatches(); }));
+            updateTrendChart(); updateVipUI(); renderMatches();
+        }
+        
+        // 需求市场渲染（进度条、我的需求编辑）
+        let showMyDemandsOnly = false;
+        function renderDemandsList() {
+            const container = document.getElementById('demandsContainer');
+            let filtered = showMyDemandsOnly ? allDemands.filter(d => d.ownerId === CURRENT_USER_ID) : allDemands;
+            if(!filtered.length){ container.innerHTML = `<div class="text-center text-gray-400 py-12 bg-white/60 rounded-2xl border border-dashed">✨ ${t('no_demands')}</div>`; return; }
+            let html = ''; filtered.forEach(d => {
+                const total = d.price * d.quantity, sym = getSymbol(d.currency);
+                const steps = ['release','collect','inspect','deliver'];
+                const progressPercent = (d.status / 3) * 100;
+                html += `<div class="demand-card bg-white/80 rounded-xl shadow-md p-4" data-id="${d.id}">
+                    <div class="flex justify-between"><div><h3 class="font-bold">📦 ${escapeHtml(d.product)}</h3><div class="text-xs text-gray-500">${t('spec')}: ${escapeHtml(d.spec||'-')} | ${t('condition')}: ${t(d.condition)}</div>
+                    <div class="flex gap-3 text-sm mt-1"><span>${t('quantity_str')}: ${d.quantity}</span><span>${t('unit_price')}: ${sym}${d.price.toFixed(2)}</span><span>⏱️ ≤${d.maxAge}${t('year_unit')}</span><span>💰 ${sym}${total.toFixed(2)}</span></div>
+                    <div class="mt-2"><div class="progress-bar"><div class="progress-fill" style="width: ${progressPercent}%"></div></div><div class="flex justify-between text-xs mt-1">${steps.map((step,i) => `<span class="status-step ${i<=d.status?'active':''}" data-step="${i}" data-id="${d.id}">${t(step)}</span>`).join('')}</div></div>
+                    ${showMyDemandsOnly ? `<div class="flex gap-2 mt-2"><button class="edit-demand-btn text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded" data-id="${d.id}">${t('edit')}</button><button class="delete-demand-btn text-xs bg-red-100 text-red-600 px-2 py-1 rounded" data-id="${d.id}">${t('close')}</button></div>` : ''}
+                </div></div></div>`;
+            }); container.innerHTML = html;
+            if(showMyDemandsOnly){
+                document.querySelectorAll('.edit-demand-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const id = parseInt(btn.dataset.id); const demand = allDemands.find(d=>d.id===id); if(demand) openEditDemandModal(demand); }));
+                document.querySelectorAll('.delete-demand-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); const id = parseInt(btn.dataset.id); allDemands = allDemands.filter(d=>d.id!==id); saveDemands(); renderDemandsList(); renderMatches(); }));
+                document.querySelectorAll('.status-step').forEach(step => step.addEventListener('click', (e) => { e.stopPropagation(); const id = parseInt(step.dataset.id); const stepIdx = parseInt(step.dataset.step); const demand = allDemands.find(d=>d.id===id); if(demand) { demand.status = stepIdx; saveDemands(); renderDemandsList(); } }));
+            } else {
+                document.querySelectorAll('.demand-card').forEach(card => card.addEventListener('click', () => { const id = parseInt(card.dataset.id); const d = allDemands.find(d=>d.id===id); if(d) alert(`${t('demand_detail_title')}\n${t('demand_product_pl')}: ${d.product}\n${t('spec')}: ${d.spec||'-'}\n${t('condition')}: ${t(d.condition)}\n${t('quantity_str')}: ${d.quantity}\n${t('unit_price')}: ${getSymbol(d.currency)}${d.price}\n${t('max_age_pl')}: ${d.maxAge}${t('year_unit')}\n${t('total_budget')}: ${getSymbol(d.currency)}${d.price*d.quantity}\n${t('contact_info')}: ${d.contact||t('none')}`); }));
+            }
+        }
+        function openEditDemandModal(demand) {
+            const newProduct = prompt(t('demand_product_pl'), demand.product); if(newProduct) demand.product = newProduct;
+            const newSpec = prompt(t('spec'), demand.spec||''); if(newSpec !== null) demand.spec = newSpec;
+            const newPrice = parseFloat(prompt(t('unit_price'), demand.price)); if(!isNaN(newPrice)) demand.price = newPrice;
+            const newQuantity = parseInt(prompt(t('quantity_str'), demand.quantity)); if(!isNaN(newQuantity)) demand.quantity = newQuantity;
+            const newMaxAge = parseFloat(prompt(t('max_age_pl'), demand.maxAge)); if(!isNaN(newMaxAge)) demand.maxAge = newMaxAge;
+            const newCondition = prompt(t('condition'), demand.condition); if(newCondition && ['like_new','slight_use','visible_marks'].includes(newCondition)) demand.condition = newCondition;
+            saveDemands(); renderDemandsList(); renderMatches();
+        }
+        function publishDemand() {
+            const product = document.getElementById('demandProduct').value.trim();
+            const spec = document.getElementById('demandSpec').value.trim();
+            const condition = document.getElementById('demandCondition').value;
+            const quantity = parseInt(document.getElementById('demandQuantity').value);
+            let price = parseFloat(document.getElementById('demandPrice').value);
+            const currency = document.getElementById('demandCurrency').value;
+            const maxAge = parseFloat(document.getElementById('demandMaxAge').value);
+            if(!product||isNaN(quantity)||quantity<=0||isNaN(price)||price<=0||isNaN(maxAge)||maxAge<=0){ alert(t('fill_all')); return; }
+            allDemands.unshift({ id: Date.now(), product, spec, condition, quantity, price, currency, maxAge, ownerId: CURRENT_USER_ID, status: 0, contact: '', publishDate: new Date().toISOString() });
+            saveDemands(); renderDemandsList(); renderMatches();
+            document.getElementById('demandProduct').value=''; document.getElementById('demandSpec').value=''; document.getElementById('demandQuantity').value='1'; document.getElementById('demandPrice').value=''; document.getElementById('demandMaxAge').value='4';
+        }
+        function saveDemands(){ localStorage.setItem('loopback_demands',JSON.stringify(allDemands)); }
+        
+        // 趋势图表
+        function updateTrendChart() {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            if(trendChart) trendChart.destroy();
+            if(!assets.length){ trendChart = new Chart(ctx, { type:'line', data:{ labels:[t('no_data')], datasets:[{ data:[0] }] } }); return; }
+            const months = [...Array(12)].map((_,i)=>{ const d=new Date(); d.setMonth(d.getMonth()-6+i); return `${d.getMonth()+1}/${d.getFullYear()}`; });
+            if(chartMode === 'avg'){
+                const avgVals = months.map((_,idx)=>{ const target=new Date(); target.setMonth(target.getMonth()-6+idx); let sum=0; assets.forEach(a=>sum+=convert(calcValueAtDate(a,target), a.currency, currentDisplay)); return sum/assets.length; });
+                trendChart = new Chart(ctx, { type:'line', data:{ labels:months, datasets:[{ label:t('avg_value'), data:avgVals, borderColor:'#10b981', tension:0.2 }] } });
+                document.getElementById('chartHint').innerText = t('chart_hint_avg');
+            } else {
+                const datasets = assets.slice(0,4).map((a,idx)=>({ label:a.name, data:months.map((_,i)=>{ const target=new Date(); target.setMonth(target.getMonth()-6+i); return convert(calcValueAtDate(a,target), a.currency, currentDisplay); }), borderColor:['#f59e0b','#3b82f6','#ef4444','#8b5cf6'][idx%4], tension:0.2 }));
+                trendChart = new Chart(ctx, { type:'line', data:{ labels:months, datasets } });
+                document.getElementById('chartHint').innerText = t('chart_hint_ind');
+            }
+        }
+        
+        function saveAssets(){ localStorage.setItem('loopback_assets',JSON.stringify(assets)); }
+        function addScore(points){ userScore+=points; localStorage.setItem(SCORE_KEY,userScore); document.getElementById('userScoreDisplay').innerText=userScore; renderMatches(); }
+        function loadUserScore(){ const s=localStorage.getItem(SCORE_KEY); if(s) userScore=parseInt(s); document.getElementById('userScoreDisplay').innerText=userScore; }
+        function loadVip(){ const v=localStorage.getItem(VIP_KEY); if(v==='vip'||v==='svip') vipLevel=v; else vipLevel='free'; updateVipUI(); }
+        function setVipLevel(level){ vipLevel=level; localStorage.setItem(VIP_KEY,vipLevel); updateVipUI(); renderAssetsList(); }
+        function getAssetLimit(){ if(vipLevel==='svip') return Infinity; if(vipLevel==='vip') return 10; return 5; }
+        function updateVipUI(){ const names={free:t('vip_free'),vip:t('vip_name'),svip:t('svip_name')}; document.getElementById('vipLevelDisplay').innerText=names[vipLevel]; const limit=getAssetLimit(), cur=assets.length; document.getElementById('assetLimitHint').innerHTML=limit===Infinity?`∞`:`(${cur}/${limit})`; }
+        window.openSubscriptionModal=function(){ const modal=document.createElement('div'); modal.className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'; modal.innerHTML=`<div class="bg-white rounded-2xl max-w-md w-full p-5"><h3 class="font-bold text-xl"><i class="fas fa-crown text-amber-500"></i> VIP ${t('subscription')}</h3><div class="space-y-3 mt-4"><div class="border p-3 rounded cursor-pointer hover:bg-amber-50" id="setFreeBtn"><div class="flex justify-between"><span>${t('vip_free')}</span><span>0</span></div><p class="text-xs">${t('asset_limit_free')}</p></div><div class="border p-3 rounded cursor-pointer hover:bg-amber-50" id="upgradeVipBtn"><div class="flex justify-between"><span>${t('vip_name')}</span><span>¥9.9/${t('month')}</span></div><p class="text-xs">${t('asset_limit_vip')} · ${t('vip_priority')}</p></div><div class="border p-3 rounded cursor-pointer hover:bg-amber-50" id="upgradeSvipBtn"><div class="flex justify-between"><span>${t('svip_name')}</span><span>¥19.9/${t('month')}</span></div><p class="text-xs">${t('asset_limit_svip')}</p></div></div><div class="mt-4 flex justify-end"><button id="closeVipModal" class="bg-gray-200 px-4 py-2 rounded">${t('close')}</button></div></div>`; document.body.appendChild(modal); const close=()=>modal.remove(); document.getElementById('closeVipModal')?.addEventListener('click',close); document.getElementById('setFreeBtn')?.addEventListener('click',()=>{ setVipLevel('free'); close(); }); document.getElementById('upgradeVipBtn')?.addEventListener('click',()=>{ setVipLevel('vip'); close(); }); document.getElementById('upgradeSvipBtn')?.addEventListener('click',()=>{ setVipLevel('svip'); close(); }); };
+        function showScoreModal(){ alert(`${t('current_points')}: ${userScore}\n${t('current_level')}: ${userScore>1000?t('diamond'):userScore>600?t('platinum'):userScore>300?t('gold'):userScore>100?t('silver'):t('bronze')}\n${t('earn_ways')}: ${t('complete_trade')} +10`); }
+        function escapeHtml(s){ return String(s).replace(/[&<>]/g,function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;});}
+        async function fetchRates(){ try{ const res=await fetch('https://api.exchangerate-api.com/v4/latest/USD'); if(res.ok){ const data=await res.json(); if(data.rates){ exchangeRates={USD:1, CNY:data.rates.CNY||7.25, HKD:data.rates.HKD||7.82}; } } }catch(e){} }
+        function initDefaultAssets(){ return [ { id: Date.now()+1, name: 'MacBook Pro M2', price: 8999, currency: 'CNY', purchaseDate: '2024-09-15', usefulYears: 4, depreciationMethod: DEPRECIATION_METHODS.DOUBLE_DECLINING } ]; }
+        function initDefaultDemands(){ return [ 
+            { id: Date.now()+100, product: 'MacBook Pro', spec:'M2 16G', condition:'like_new', quantity:2, price: 7800, currency: 'CNY', maxAge: 3, ownerId: CURRENT_USER_ID, status: 1, contact: '', publishDate: new Date().toISOString() },
+            { id: Date.now()+101, product: 'iPhone 14 Pro', spec:'256GB', condition:'slight_use', quantity:1, price: 5200, currency: 'CNY', maxAge: 2, ownerId: CURRENT_USER_ID, status: 2, contact: '', publishDate: new Date().toISOString() },
+            { id: Date.now()+102, product: 'DJI Drone', spec:'Mini 3 Pro', condition:'like_new', quantity:1, price: 3500, currency: 'CNY', maxAge: 1, ownerId: CURRENT_USER_ID, status: 3, contact: '', publishDate: new Date().toISOString() }
+        ]; }
+        
+        document.getElementById('addAssetBtn').addEventListener('click', addAssetWithQuestionnaire);
+        document.getElementById('publishDemandBtn').addEventListener('click', publishDemand);
+        document.getElementById('tabAssetsBtn').addEventListener('click',()=>{ document.getElementById('assetsPage').classList.remove('hidden'); document.getElementById('marketPage').classList.add('hidden'); document.getElementById('tabAssetsBtn').classList.add('page-tab-active'); document.getElementById('tabMarketBtn').classList.remove('page-tab-active'); renderMatches(); });
+        document.getElementById('tabMarketBtn').addEventListener('click',()=>{ document.getElementById('assetsPage').classList.add('hidden'); document.getElementById('marketPage').classList.remove('hidden'); document.getElementById('tabMarketBtn').classList.add('page-tab-active'); document.getElementById('tabAssetsBtn').classList.remove('page-tab-active'); renderDemandsList(); });
+        document.getElementById('scoreCardBtn').addEventListener('click', showScoreModal);
+        document.getElementById('refreshRatesBtn').addEventListener('click',async()=>{ await fetchRates(); renderAssetsList(); updateTrendChart(); renderMatches(); });
+        document.getElementById('displayCurrency').addEventListener('change',(e)=>{ currentDisplay=e.target.value; renderAssetsList(); updateTrendChart(); renderMatches(); });
+        document.getElementById('viewAvgBtn').addEventListener('click',()=>{ chartMode='avg'; updateTrendChart(); });
+        document.getElementById('viewIndividualBtn').addEventListener('click',()=>{ chartMode='individual'; updateTrendChart(); });
+        document.getElementById('showAllDemandsBtn').addEventListener('click',()=>{ showMyDemandsOnly=false; renderDemandsList(); });
+        document.getElementById('showMyDemandsBtn').addEventListener('click',()=>{ showMyDemandsOnly=true; renderDemandsList(); });
+        document.querySelectorAll('.lang-btn').forEach(btn=>btn.addEventListener('click',()=>setLanguage(btn.dataset.lang)));
+        (async()=>{ await fetchRates(); loadUserScore(); loadVip(); let storedAssets=localStorage.getItem('loopback_assets'); if(storedAssets) assets=JSON.parse(storedAssets); else assets=[]; if(assets.length===0){ assets=initDefaultAssets(); saveAssets(); } let storedDemands=localStorage.getItem('loopback_demands'); if(storedDemands) allDemands=JSON.parse(storedDemands); else allDemands=[]; if(allDemands.length===0){ allDemands=initDefaultDemands(); saveDemands(); } renderAssetsList(); renderDemandsList(); setLanguage('zh-CN'); renderMatches(); })();
+    </script>
+</body>
+</html>
